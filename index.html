@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📖 Nhật ký cá nhân bảo mật</title>
+<style>
+body {
+    font-family: "Georgia", serif;
+    background: linear-gradient(120deg, #c9d6ff, #e2e2e2);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+#auth-container, #diary-container {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    width: 400px;
+}
+h2 {
+    text-align: center;
+}
+input, button, textarea {
+    width: 100%;
+    margin: 5px 0;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+button {
+    background: #6b63ff;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: 0.2s;
+}
+button:hover {
+    background: #5548f0;
+}
+
+/* --- Nhật ký --- */
+.book {
+    position: relative;
+    width: 350px;
+    height: 450px;
+    perspective: 2000px;
+    margin: auto;
+}
+.page {
+    width: 100%;
+    height: 100%;
+    background: #fffaf0;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    padding: 20px;
+    box-sizing: border-box;
+    position: absolute;
+    top: 0;
+    left: 0;
+    backface-visibility: hidden;
+    transform-origin: left center;
+    transition: transform 0.6s ease;
+    overflow-y: auto;
+    font-family: "Times New Roman", serif;
+    line-height: 1.5;
+}
+.page textarea {
+    width: 100%;
+    height: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    resize: none;
+    font-size: 16px;
+}
+.page.flipped {
+    transform: rotateY(-180deg);
+}
+.page-number {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 12px;
+    color: #666;
+}
+.controls {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+}
+#logoutBtn {
+    background: #ff4d4d;
+}
+#newPageBtn {
+    background: #ffa600;
+}
+#saveBtn {
+    background: #4CAF50;
+}
+</style>
+</head>
+<body>
+
+<!-- Đăng ký/Đăng nhập -->
+<div id="auth-container">
+    <h2>Đăng ký / Đăng nhập</h2>
+    <input type="text" id="username" placeholder="Tài khoản">
+    <input type="password" id="password" placeholder="Mật khẩu">
+    <input type="password" id="pin" placeholder="Mã PIN (4 số)">
+    <button id="registerBtn">Đăng ký</button>
+    <button id="loginBtn">Đăng nhập</button>
+</div>
+
+<!-- Giao diện nhật ký -->
+<div id="diary-container" style="display:none;">
+    <h2>📖 Nhật ký của <span id="userDisplay"></span></h2>
+    <div class="book" id="book"></div>
+    <div class="controls">
+        <button id="prevPageBtn">⬅ Trang trước</button>
+        <button id="newPageBtn">+ Trang mới</button>
+        <button id="nextPageBtn">Trang sau ➡</button>
+    </div>
+    <div class="controls">
+        <button id="saveBtn">💾 Lưu</button>
+        <button id="logoutBtn">🚪 Đăng xuất</button>
+    </div>
+</div>
+
+<script>
+const registerBtn = document.getElementById('registerBtn');
+const loginBtn = document.getElementById('loginBtn');
+const usernameInput = document.getElementById('username');
+const passwordInput = document.getElementById('password');
+const pinInput = document.getElementById('pin');
+const authContainer = document.getElementById('auth-container');
+const diaryContainer = document.getElementById('diary-container');
+const userDisplay = document.getElementById('userDisplay');
+const logoutBtn = document.getElementById('logoutBtn');
+const saveBtn = document.getElementById('saveBtn');
+const newPageBtn = document.getElementById('newPageBtn');
+const book = document.getElementById('book');
+const prevBtn = document.getElementById('prevPageBtn');
+const nextBtn = document.getElementById('nextPageBtn');
+
+let currentUser = null;
+let currentPage = 0;
+let data = null;
+
+// Khi tải trang
+window.onload = () => {
+    const loggedInUser = localStorage.getItem('loggedInUser');
+    if (loggedInUser) {
+        currentUser = loggedInUser;
+        showDiary();
+    }
+};
+
+// Đăng ký
+registerBtn.onclick = () => {
+    const user = usernameInput.value.trim();
+    const pass = passwordInput.value.trim();
+    const pin = pinInput.value.trim();
+
+    if (!user || !pass || !pin) return alert("Vui lòng nhập đầy đủ tài khoản, mật khẩu và mã PIN!");
+    if (pin.length !== 4 || isNaN(pin)) return alert("Mã PIN phải gồm đúng 4 chữ số!");
+    if (localStorage.getItem('user_' + user)) {
+        alert("Tài khoản đã tồn tại!");
+        return;
+    }
+    const data = { password: pass, pin: pin, pages: [""] };
+    localStorage.setItem('user_' + user, JSON.stringify(data));
+    alert("Đăng ký thành công! Hãy đăng nhập nhé!");
+};
+
+// Đăng nhập
+loginBtn.onclick = () => {
+    const user = usernameInput.value.trim();
+    const pass = passwordInput.value.trim();
+    const pin = pinInput.value.trim();
+
+    const stored = localStorage.getItem('user_' + user);
+    if (!stored) return alert("Tài khoản không tồn tại!");
+    const dataObj = JSON.parse(stored);
+
+    if (dataObj.password !== pass) return alert("Sai mật khẩu!");
+    if (dataObj.pin !== pin) return alert("Sai mã PIN!");
+
+    currentUser = user;
+    localStorage.setItem('loggedInUser', user);
+    showDiary();
+};
+
+// Hiển thị nhật ký
+function showDiary() {
+    authContainer.style.display = 'none';
+    diaryContainer.style.display = 'block';
+    userDisplay.textContent = currentUser;
+    data = JSON.parse(localStorage.getItem('user_' + currentUser));
+    renderBook();
+    updatePageDisplay();
+}
+
+// Tạo cuốn nhật ký
+function renderBook() {
+    book.innerHTML = '';
+    data.pages.forEach((content, i) => {
+        const page = document.createElement('div');
+        page.className = 'page';
+        page.style.zIndex = data.pages.length - i; // trang sau nằm trên
+        if (i < currentPage) page.classList.add('flipped');
+
+        const textarea = document.createElement('textarea');
+        textarea.value = content;
+        page.appendChild(textarea);
+
+        const num = document.createElement('div');
+        num.className = 'page-number';
+        num.textContent = `Trang ${i + 1}`;
+        page.appendChild(num);
+
+        book.appendChild(page);
+    });
+}
+
+// Cập nhật hiển thị trang
+function updatePageDisplay() {
+    document.querySelectorAll('.page').forEach((page, i) => {
+        if (i < currentPage) page.classList.add('flipped');
+        else page.classList.remove('flipped');
+    });
+}
+
+// Nút điều hướng
+nextBtn.onclick = () => {
+    if (currentPage < data.pages.length - 1) {
+        currentPage++;
+        updatePageDisplay();
+    }
+};
+prevBtn.onclick = () => {
+    if (currentPage > 0) {
+        currentPage--;
+        updatePageDisplay();
+    }
+};
+
+// Thêm trang mới
+newPageBtn.onclick = () => {
+    data.pages.push("");
+    currentPage = data.pages.length - 1;
+    renderBook();
+    updatePageDisplay();
+};
+
+// Lưu nội dung
+saveBtn.onclick = () => {
+    const pages = Array.from(document.querySelectorAll('.page textarea')).map(t => t.value);
+    data.pages = pages;
+    localStorage.setItem('user_' + currentUser, JSON.stringify(data));
+    alert("💾 Đã lưu nhật ký an toàn!");
+};
+
+// Đăng xuất
+logoutBtn.onclick = () => {
+    localStorage.removeItem('loggedInUser');
+    currentUser = null;
+    authContainer.style.display = 'block';
+    diaryContainer.style.display = 'none';
+};
+</script>
+</body>
+</html>
